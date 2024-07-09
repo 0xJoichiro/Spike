@@ -20,11 +20,26 @@
 - https://github.com/code-423n4/2023-09-centrifuge/tree/main
 - https://code4rena.com/audits/2023-09-centrifuge
 
+
+- [x] Docs Read
+- Code Read
+  - Take notes inline 
+- Report Read
+  - examine bot reports
+  - Auditbook Report
+  - Take notes
+- Test Read/Make
+- Take notes
+
+
 Automated findings output for the audit can be found [here](https://github.com/code-423n4/2023-09-centrifuge/blob/main/bot-report.md) within 24 hours of audit opening.
 
+![alt text](assets/image.png)
+![alt text](assets/image-1.png)
+![alt text](assets/image2.png)
 ### Notes
 
-
+```
 src/util/Context.sol	6
 src/Escrow.sol	17
 src/util/SafeTransferLib.sol	17
@@ -43,3 +58,4 @@ src/PoolManager.sol	261
 src/gateway/Gateway.sol	328
 src/InvestmentManager.sol	527
 src/gateway/Messages.sol	619
+```

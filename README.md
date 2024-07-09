@@ -10,5 +10,21 @@ steps
 
 - docs
 - flow diagram and pre using solidity metrics
+- examine bot reports
 - deep dive from less to more
-- 
+- test coverage
+- examine bot reports
+
+
+
+### One day audit - ODA
+
+- Docs Read
+- Code Read
+  - Take notes inline 
+- Report Read
+  - examine bot reports
+  - Auditbook Report
+  - Take notes
+- Test Read/Make
+- Take notes
