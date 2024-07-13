@@ -1,0 +1,570 @@
+<div class="p-5"><div class="markdown undefined"><h1 id="issue-h-1-wrong-precision-when-adding-balance-within-the-restorebridgetransaction-function">Issue H-1: Wrong precision when adding balance within the <code>restoreBridgeTransaction</code> function</h1>
+    <p>Source: <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/5">https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/5</a> </p>
+    <h2 id="found-by">Found by</h2>
+    <p>0xAadi, slowfi, xiaoming90</p>
+    <h2 id="summary">Summary</h2>
+    <p>Wrong precision when adding balance within the <code>restoreBridgeTransaction</code> function, leading to loss of assets.</p>
+    <h2 id="vulnerability-detail">Vulnerability Detail</h2>
+    <p>In Line 90 below, the <code>AccountStorage.layout().balances</code> stores the account's balance in 18 precision, while the <code>bridgeTransaction.amount</code> stores the amount of token to be bridged in token native precision (e.g., USDC = 6 decimals).</p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L90">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L90</a></p>
+    <pre><code class="solidity language-solidity">File: BridgeFacetImpl.sol
+    83:     function restoreBridgeTransaction(uint256 transactionId, uint256 validAmount) internal {
+    84:         BridgeStorage.Layout storage bridgeLayout = BridgeStorage.layout();
+    85:         BridgeTransaction storage bridgeTransaction = bridgeLayout.bridgeTransactions[transactionId];
+    86: 
+    87:         require(bridgeTransaction.status == BridgeTransactionStatus.SUSPENDED, "BridgeFacet: Invalid status");
+    88:         require(bridgeLayout.invalidBridgedAmountsPool != address(0), "BridgeFacet: Zero address");
+    89: 
+    90:         AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += (bridgeTransaction.amount - validAmount);
+    91:         bridgeTransaction.status = BridgeTransactionStatus.RECEIVED;
+    92:         bridgeTransaction.amount = validAmount;
+    93:     }</code></pre>
+    <p>Assume that the number of tokens to bridge is 10000 USDC (10000e6). Thus, <code>bridgeTransaction.amount</code> will be set to 10000e6. The protocol detects an anomaly with the bridging transaction and suspends it. After reviewing the transaction, the protocol decides to deduct 50% of the total bridged amount (5000 USDC).</p>
+    <p>The protocol executes <code>restoreBridgeTransaction</code> function with <code>validAmount</code> parameter set to 5000 USDC (1e6). The balance of "invalidBridgedAmountsPool" account will be incremented by 5000e6, as shown below. This is incorrect because the account balance in the protocol is denominated in 18 decimal precision. Over here, the code fails to convert the native token precision to the protocol's native precision (18) before assigning it to the account balance.</p>
+    <pre><code class="solidity language-solidity">AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += (bridgeTransaction.amount - validAmount);
+    AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += 10000e6 - 5000e6
+    AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += 5000e6</code></pre>
+    <p>When the protocol attempts to withdraw the assets from the "invalidBridgedAmountsPool" account, the <code>accountLayout.balances[msg.sender]</code> will be 5000e6, and thus, the maximum value of <code>amountWith18Decimals</code> will be 5000e6. If <code>amountWith18Decimals</code> is 5000e6, the maximum <code>amount</code> that can be withdrawn will be 0.000000000000005 USDC based on the following formula. </p>
+    <p>The protocol should have received 5000 USDC, but due to a precision error, it could only receive a maximum of 0.000000000000005 USDC, resulting in a loss of assets.</p>
+    <pre><code class="solidity language-solidity">amountWith18Decimals = (amount * 1e18) / (10 ** IERC20Metadata(appLayout.collateral).decimals());
+    5000e6 = (amount * 1e18) / 1e6
+    5000e6 / 1e6 = amount * 1e18
+    5000 = amount * 1e18
+    amount = 5000/1e18
+    amount = 0.000000000000005</code></pre>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacetImpl.sol#L33">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacetImpl.sol#L33</a></p>
+    <pre><code class="solidity language-solidity">File: AccountFacetImpl.sol
+    26:     function withdraw(address user, uint256 amount) internal {
+    27:         AccountStorage.Layout storage accountLayout = AccountStorage.layout();
+    28:         GlobalAppStorage.Layout storage appLayout = GlobalAppStorage.layout();
+    29:         require(
+    30:             block.timestamp &gt;= accountLayout.withdrawCooldown[msg.sender] + MAStorage.layout().deallocateCooldown,
+    31:             "AccountFacet: Cooldown hasn't reached"
+    32:         );
+    33:         uint256 amountWith18Decimals = (amount * 1e18) / (10 ** IERC20Metadata(appLayout.collateral).decimals());
+    34:         accountLayout.balances[msg.sender] -= amountWith18Decimals;
+    35:         IERC20(appLayout.collateral).safeTransfer(user, amount);
+    36:     }</code></pre>
+    <h2 id="impact">Impact</h2>
+    <p>Loss of assets due to precision error, as shown in the above scenario.</p>
+    <h2 id="code-snippet">Code Snippet</h2>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L90">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L90</a></p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacetImpl.sol#L33">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacetImpl.sol#L33</a></p>
+    <h2 id="tool-used">Tool used</h2>
+    <p>Manual Review</p>
+    <h2 id="recommendation">Recommendation</h2>
+    <p>Scale up to the protocol's native precision of 18 decimals before assigning it to the account balance.</p>
+    <pre><code class="diff language-diff">- AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += (bridgeTransaction.amount - validAmount);
+    + AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += ((bridgeTransaction.amount - validAmount) * 1e18) / (10 ** IERC20Metadata(appLayout.collateral).decimals());</code></pre>
+    <h2 id="discussion">Discussion</h2>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The protocol team fixed this issue in the following PRs/commits:<br>
+    <a href="https://github.com/SYMM-IO/protocol-core/pull/45">https://github.com/SYMM-IO/protocol-core/pull/45</a></p>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The Lead Senior Watson signed off on the fix.</p>
+    <h1 id="issue-h-2-suspended-bridge-transactions-cannot-be-restored">Issue H-2: Suspended bridge transactions cannot be restored</h1>
+    <p>Source: <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/9">https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/9</a> </p>
+    <h2 id="found-by-1">Found by</h2>
+    <p>slowfi, xiaoming90</p>
+    <h2 id="summary-1">Summary</h2>
+    <p>Suspended bridge transactions cannot be restored. As a result, the assets will be stuck, and bridge service providers cannot reclaim the assets they have transferred to the users from the protocol. </p>
+    <h2 id="vulnerability-detail-1">Vulnerability Detail</h2>
+    <p>In Line 90 below, when restoring the bridge transaction, the invalid assets will be deposited into the account of <code>bridgeLayout.invalidBridgedAmountsPool</code>. These invalid assets can be withdrawn from this account/pool at a later time.</p>
+    <p>Per Line 88 below, if the <code>bridgeLayout.invalidBridgedAmountsPool</code> is zero, the <code>restoreBridgeTransaction</code> transaction will revert.</p>
+    <p>However, within the codebase, there is no way to update the <code>bridgeLayout.invalidBridgedAmountsPool</code> value. Thus, the <code>bridgeLayout.invalidBridgedAmountsPool</code> will always be zero. The <code>restoreBridgeTransaction</code> transaction will always revert and there is no way to restore a suspended bridge transaction. As a result, the assets will be stuck, and bridge service providers will not be able to reclaim the assets they have transferred to the users from the protocol.</p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L88">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L88</a></p>
+    <pre><code class="solidity language-solidity">File: BridgeFacetImpl.sol
+    83:     function restoreBridgeTransaction(uint256 transactionId, uint256 validAmount) internal {
+    84:         BridgeStorage.Layout storage bridgeLayout = BridgeStorage.layout();
+    85:         BridgeTransaction storage bridgeTransaction = bridgeLayout.bridgeTransactions[transactionId];
+    86: 
+    87:         require(bridgeTransaction.status == BridgeTransactionStatus.SUSPENDED, "BridgeFacet: Invalid status");
+    88:         require(bridgeLayout.invalidBridgedAmountsPool != address(0), "BridgeFacet: Zero address");
+    89: 
+    90:         AccountStorage.layout().balances[bridgeLayout.invalidBridgedAmountsPool] += (bridgeTransaction.amount - validAmount);
+    91:         bridgeTransaction.status = BridgeTransactionStatus.RECEIVED;
+    92:         bridgeTransaction.amount = validAmount;
+    93:     }</code></pre>
+    <h2 id="impact-1">Impact</h2>
+    <p>Loss of assets. The assets will be stuck, and bridge service providers cannot reclaim the assets they have transferred to the users from the protocol. </p>
+    <h2 id="code-snippet-1">Code Snippet</h2>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L88">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Bridge/BridgeFacetImpl.sol#L88</a></p>
+    <h2 id="tool-used-1">Tool used</h2>
+    <p>Manual Review</p>
+    <h2 id="recommendation-1">Recommendation</h2>
+    <p>Implement a setter function for the <code>invalidBridgedAmountsPool</code> variable.</p>
+    <pre><code class="diff language-diff">+ function updateInvalidBridgedAmountsPool(address poolAddress) external onlyRole(LibAccessibility.DEFAULT_ADMIN_ROLE) {
+    +  BridgeStorage.layout().invalidBridgedAmountsPool = poolAddress;
+    + }</code></pre>
+    <h2 id="discussion-1">Discussion</h2>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The protocol team fixed this issue in the following PRs/commits:<br>
+    <a href="https://github.com/SYMM-IO/protocol-core/pull/46">https://github.com/SYMM-IO/protocol-core/pull/46</a></p>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The Lead Senior Watson signed off on the fix.</p>
+    <h1 id="issue-m-1-partyas-allocated-balance-could-increase-after-deferredliquidatepartya-is-executed">Issue M-1: PartyA's allocated balance could increase after <code>deferredLiquidatePartyA</code> is executed</h1>
+    <p>Source: <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/6">https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/6</a> </p>
+    <h2 id="found-by-2">Found by</h2>
+    <p>xiaoming90</p>
+    <h2 id="summary-2">Summary</h2>
+    <p>PartyA's allocated balance could increase after <code>deferredLiquidatePartyA</code> is executed in an edge case, which could result in loss of assets.</p>
+    <h2 id="vulnerability-detail-2">Vulnerability Detail</h2>
+    <p>When the <code>deferredLiquidatePartyA</code> function is executed, if there is any excess allocated balance in <code>accountLayout.allocatedBalances[partyA]</code>, they will be transferred to the <code>accountLayout.partyAReimbursement[partyA]</code> at Line 42 below. Afterwards, the <code>accountLayout.allocatedBalances[partyA]</code> should not increase under any circumstance. Otherwise, an accounting error will occur.</p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L22">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L22</a></p>
+    <pre><code class="solidity language-solidity">File: DeferredLiquidationFacetImpl.sol
+    22:     function deferredLiquidatePartyA(address partyA, DeferredLiquidationSig memory liquidationSig) internal {
+    23:         MAStorage.Layout storage maLayout = MAStorage.layout();
+    24:         AccountStorage.Layout storage accountLayout = AccountStorage.layout();
+    25: 
+    26:         LibMuon.verifyDeferredLiquidationSig(liquidationSig, partyA);
+    27: 
+    28:         int256 liquidationAvailableBalance = LibAccount.partyAAvailableBalanceForLiquidation(
+    29:             liquidationSig.upnl,
+    30:             liquidationSig.liquidationAllocatedBalance,
+    31:             partyA
+    32:         );
+    33:         require(liquidationAvailableBalance &lt; 0, "LiquidationFacet: PartyA is solvent");
+    34: 
+    35:         int256 availableBalance = LibAccount.partyAAvailableBalanceForLiquidation(
+    36:             liquidationSig.upnl,
+    37:             accountLayout.allocatedBalances[partyA],
+    38:             partyA
+    39:         );
+    40:         if (availableBalance &gt; 0) {
+    41:             accountLayout.allocatedBalances[partyA] -= uint256(availableBalance);
+    42:             accountLayout.partyAReimbursement[partyA] += uint256(availableBalance);
+    43:         }</code></pre>
+    <p>However, there is an edge case where the <code>accountLayout.allocatedBalances[partyA]</code> can increase after the <code>deferredLiquidatePartyA</code> function is executed.</p>
+    <p>Assume Bob is a liquidator and a PartyA at the same time. As PartyA is permissionless, anyone can be a PartyA. There is no validation check in the codebase that prevents a liquidator from also being a PartyA AND no rules stated on the contest page that a liquidator cannot be a PartyA. Thus, it is fair to assume that some liquidators might use the same wallet to trade on the Symm App simultaneously (Users of Symm App = PartyA).</p>
+    <ol>
+    <li>At T1, Bob's liquidator account took part in some liquidation process. </li>
+    <li>At T2, Bob's PartyA account gets liquidated by the <code>deferredLiquidatePartyA</code> function (Step 1 of liquidation process), and his <code>accountLayout.allocatedBalances[Bob]</code> has been set to zero at Line 41 above.</li>
+    <li>At T3. Some liquidations have been settled, and the liquidation fees are transferred to <code>accountLayout.allocatedBalances[Bob]</code> as per the code at Line 297-298 below. Assume that 1000 is paid out as a liquidation fee to Bob. Thus, <code>accountLayout.allocatedBalances[Bob] = 1000</code> now.</li>
+    </ol>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/LiquidationFacetImpl.sol#L297">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/LiquidationFacetImpl.sol#L297</a></p>
+    <pre><code class="solidity language-solidity">File: LiquidationFacetImpl.sol
+    295:             uint256 lf = accountLayout.liquidationDetails[partyA].liquidationFee;
+    296:             if (lf &gt; 0) {
+    297:                 accountLayout.allocatedBalances[accountLayout.liquidators[partyA][0]] += lf / 2;
+    298:                 accountLayout.allocatedBalances[accountLayout.liquidators[partyA][1]] += lf / 2;
+    299:                 emit SharedEvents.BalanceChangePartyA(accountLayout.liquidators[partyA][0], lf / 2, SharedEvents.BalanceChangeType.LF_IN);
+    300:                 emit SharedEvents.BalanceChangePartyA(accountLayout.liquidators[partyA][1], lf / 2, SharedEvents.BalanceChangeType.LF_IN);
+    301:             }</code></pre>
+    <ol start="3">
+    <li><code>accountLayout.allocatedBalances[Bob] = 1000</code> at this point. Next, the <code>deferredSetSymbolsPrice</code> function (Step 2 of liquidation process) will called against Bob's PartyA account.</li>
+    <li>The <code>deferredSetSymbolsPrice</code> is designed to always expect the <code>availableBalance</code> at Line 76 to be zero or negative to work properly. If <code>availableBalance</code> is positive, the logic and accounting will be incorrect. Because the <code>accountLayout.allocatedBalances[Bob] = 1000</code>, the <code>availableBalance</code> will become a positive value. Let's assume that <code>availableBalance</code> returned from <code>LibAccount.partyAAvailableBalanceForLiquidation</code> function at Line 76 is 800 after factoring the PnL (loss and/or deficit)</li>
+    <li>In Line 80 below, the <code>remainingLf</code> will be evaluated as 900. The liquidation fee of PartyA account will unexpectedly increase from 100 to 900, which is incorrect regarding the system's accounting. The liquidators should only receive up to <code>accountLayout.lockedBalances[partyA].lf</code> (100) of liquidation and not more than that amount. However, in this case, the liquidators received more than expected (900 instead of 100).</li>
+    </ol>
+    <pre><code class="solidity language-solidity">remainingLf = accountLayout.lockedBalances[partyA].lf - (- availableBalance);
+    remainingLf = 100 - (-800);
+    remainingLf = 900</code></pre>
+    <ol start="6">
+    <li>As a result, 800 of the liquidation fee, which was supposed to belong to Bob, went to the liquidator's wallet. In this scenario, Bob lost 800.</li>
+    </ol>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62</a></p>
+    <pre><code class="solidity language-solidity">File: DeferredLiquidationFacetImpl.sol
+    62:     function deferredSetSymbolsPrice(address partyA, DeferredLiquidationSig memory liquidationSig) internal {
+    63:         MAStorage.Layout storage maLayout = MAStorage.layout();
+    64:         AccountStorage.Layout storage accountLayout = AccountStorage.layout();
+    65: 
+    66:         LibMuon.verifyDeferredLiquidationSig(liquidationSig, partyA);
+    67:         require(maLayout.liquidationStatus[partyA], "LiquidationFacet: PartyA is solvent");
+    68: 
+    69:         LiquidationDetail storage detail = accountLayout.liquidationDetails[partyA];
+    70:         require(keccak256(detail.liquidationId) == keccak256(liquidationSig.liquidationId), "LiquidationFacet: Invalid liquidationId");
+    71: 
+    72:         for (uint256 index = 0; index &lt; liquidationSig.symbolIds.length; index++) {
+    73:             accountLayout.symbolsPrices[partyA][liquidationSig.symbolIds[index]] = Price(liquidationSig.prices[index], detail.timestamp);
+    74:         }
+    75: 
+    76:         int256 availableBalance = LibAccount.partyAAvailableBalanceForLiquidation(liquidationSig.upnl, accountLayout.allocatedBalances[partyA], partyA);
+    77: 
+    78:         if (detail.liquidationType == LiquidationType.NONE) {
+    79:             if (uint256(- availableBalance) &lt; accountLayout.lockedBalances[partyA].lf) {
+    80:                 uint256 remainingLf = accountLayout.lockedBalances[partyA].lf - uint256(- availableBalance);
+    81:                 detail.liquidationType = LiquidationType.NORMAL;
+    82:                 detail.liquidationFee = remainingLf;
+    83:             } else if (uint256(- availableBalance) &lt;= accountLayout.lockedBalances[partyA].lf + accountLayout.lockedBalances[partyA].cva) {
+    84:                 uint256 deficit = uint256(- availableBalance) - accountLayout.lockedBalances[partyA].lf;
+    85:                 detail.liquidationType = LiquidationType.LATE;
+    86:                 detail.deficit = deficit;
+    87:             } else {
+    88:                 uint256 deficit = uint256(- availableBalance) - accountLayout.lockedBalances[partyA].lf - accountLayout.lockedBalances[partyA].cva;
+    89:                 detail.liquidationType = LiquidationType.OVERDUE;
+    90:                 detail.deficit = deficit;
+    91:             }
+    92:             accountLayout.liquidators[partyA].push(msg.sender);
+    93:         }
+    94:     }</code></pre>
+    <h2 id="impact-2">Impact</h2>
+    <p>Loss of assets as shown in the above scenario.</p>
+    <h2 id="code-snippet-2">Code Snippet</h2>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L22">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L22</a></p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/LiquidationFacetImpl.sol#L297">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/LiquidationFacetImpl.sol#L297</a></p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62</a></p>
+    <h2 id="tool-used-2">Tool used</h2>
+    <p>Manual Review</p>
+    <h2 id="recommendation-2">Recommendation</h2>
+    <p>Implement the following additional logic to handle any edge case where PartyA's allocated balance could increase after <code>deferredLiquidatePartyA</code> (Step 1 of the liquidation process) is executed.</p>
+    <pre><code class="diff language-diff">    function deferredSetSymbolsPrice(address partyA, DeferredLiquidationSig memory liquidationSig) internal {
+            MAStorage.Layout storage maLayout = MAStorage.layout();
+            AccountStorage.Layout storage accountLayout = AccountStorage.layout();
+    
+            LibMuon.verifyDeferredLiquidationSig(liquidationSig, partyA);
+            require(maLayout.liquidationStatus[partyA], "LiquidationFacet: PartyA is solvent");
+    
+            LiquidationDetail storage detail = accountLayout.liquidationDetails[partyA];
+            require(keccak256(detail.liquidationId) == keccak256(liquidationSig.liquidationId), "LiquidationFacet: Invalid liquidationId");
+    
+            for (uint256 index = 0; index &lt; liquidationSig.symbolIds.length; index++) {
+                accountLayout.symbolsPrices[partyA][liquidationSig.symbolIds[index]] = Price(liquidationSig.prices[index], detail.timestamp);
+            }
+    
+            int256 availableBalance = LibAccount.partyAAvailableBalanceForLiquidation(liquidationSig.upnl, accountLayout.allocatedBalances[partyA], partyA);
+    
+            if (detail.liquidationType == LiquidationType.NONE) {
+    +                if (availableBalance &gt; accountLayout.lockedBalances[partyA].lf) {
+    +                uint256 remainingLf = accountLayout.lockedBalances[partyA].lf;
+    +                detail.liquidationType = LiquidationType.NORMAL;
+    +                detail.liquidationFee = remainingLf;
+    +                } else if (uint256(- availableBalance) &lt; accountLayout.lockedBalances[partyA].lf) {
+    -           if (uint256(- availableBalance) &lt; accountLayout.lockedBalances[partyA].lf) {
+                    uint256 remainingLf = accountLayout.lockedBalances[partyA].lf - uint256(- availableBalance);
+                    detail.liquidationType = LiquidationType.NORMAL;
+                    detail.liquidationFee = remainingLf;
+                } else if (uint256(- availableBalance) &lt;= accountLayout.lockedBalances[partyA].lf + accountLayout.lockedBalances[partyA].cva) {
+                    uint256 deficit = uint256(- availableBalance) - accountLayout.lockedBalances[partyA].lf;
+                    detail.liquidationType = LiquidationType.LATE;
+                    detail.deficit = deficit;
+                } else {
+                    uint256 deficit = uint256(- availableBalance) - accountLayout.lockedBalances[partyA].lf - accountLayout.lockedBalances[partyA].cva;
+                    detail.liquidationType = LiquidationType.OVERDUE;
+                    detail.deficit = deficit;
+                }
+                accountLayout.liquidators[partyA].push(msg.sender);
+            }
+        }</code></pre>
+    <h2 id="discussion-2">Discussion</h2>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>1 comment(s) were left on this issue during the judging contest.</p>
+    <p><strong>Hash01011122</strong> commented:</p>
+    <blockquote>
+      <p>Low/Medium Vuln, Chances of occurrence of mentioned edge case is nearly zero. </p>
+    </blockquote>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The protocol team fixed this issue in the following PRs/commits:<br>
+    <a href="https://github.com/SYMM-IO/protocol-core/pull/48">https://github.com/SYMM-IO/protocol-core/pull/48</a> </p>
+    <p><strong>xiaoming9090</strong></p>
+    <p>Escalate</p>
+    <p>This issue should be at least a Medium Risk due to its significant impact (Loss of assets) if the risk is realized.</p>
+    <p>Per the protocol’s source code, there is nothing to prevent a liquidator from also being a user (PartyA) since the protocol allows anyone to trade on its system. The PartyA role is permissionless and open to anyone. Also, no rules state on the contest page that a liquidator cannot be a PartyA or trade on the system.</p>
+    <p>Thus, it is entirely a valid scenario where a user is a liquidator and a PartyA simultaneously, leading to the issue mentioned in the report.</p>
+    <p>Per Sherlock’s judging rules (<a href="https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue">https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue</a>)</p>
+    <blockquote>
+      <p>V. How to identify a medium issue:<br>
+      Causes a loss of funds but requires certain external conditions or specific states, or a loss is highly constrained. The losses must exceed small, finite amount of funds, and any amount relevant based on the precision or significance of the loss.</p>
+    </blockquote>
+    <p>Thus, it meets Sherlock's requirement of a Medium Risk, where it causes a loss of funds but requires certain external conditions or specific states.</p>
+    <p><strong>sherlock-admin3</strong></p>
+    <blockquote>
+      <p>Escalate</p>
+      <p>This issue should be at least a Medium Risk due to its significant impact (Loss of assets) if the risk is realized.</p>
+      <p>Per the protocol’s source code, there is nothing to prevent a liquidator from also being a user (PartyA) since the protocol allows anyone to trade on its system. The PartyA role is permissionless and open to anyone. Also, no rules state on the contest page that a liquidator cannot be a PartyA or trade on the system.</p>
+      <p>Thus, it is entirely a valid scenario where a user is a liquidator and a PartyA simultaneously, leading to the issue mentioned in the report.</p>
+      <p>Per Sherlock’s judging rules (<a href="https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue">https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue</a>)</p>
+      <blockquote>
+        <p>V. How to identify a medium issue:<br>
+        Causes a loss of funds but requires certain external conditions or specific states, or a loss is highly constrained. The losses must exceed small, finite amount of funds, and any amount relevant based on the precision or significance of the loss.</p>
+      </blockquote>
+      <p>Thus, it meets Sherlock's requirement of a Medium Risk, where it causes a loss of funds but requires certain external conditions or specific states.</p>
+    </blockquote>
+    <p>You've created a valid escalation!</p>
+    <p>To remove the escalation from consideration: Delete your comment.</p>
+    <p>You may delete or edit your escalation comment anytime before the 48-hour escalation window closes. After that, the escalation becomes final.</p>
+    <p><strong>MxAxM</strong></p>
+    <p>Possibility of this issue is near to zero so it should be low since it's not viable </p>
+    <p><strong>xiaoming9090</strong></p>
+    <blockquote>
+      <p>Possibility of this issue is near to zero so it should be low since it's not viable</p>
+    </blockquote>
+    <p>Disagree. As mentioned in the report and escalation's comment, it is entirely a valid scenario where a user is a liquidator and a PartyA simultaneously, leading to the issue mentioned in the report.</p>
+    <p>In Sherlock, edge cases that have an impact that could potentially lead to a loss of assets are always judged as H/M. This view is derived with Sherlock's judging rule (<a href="https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue">https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue</a>) below:</p>
+    <blockquote>
+      <p>Causes a loss of funds but requires certain external conditions or specific states, or a loss is highly constrained. </p>
+    </blockquote>
+    <p><strong>WangSecurity</strong></p>
+    <p>I think I need clarification on the attack path. I'll show how I see it and please correct me if it's wrong or not:</p>
+    <ol>
+    <li>Bob is partyA.</li>
+    <li>Bob is liquidated by Alice and his balance is set at 0.</li>
+    <li>Bob does some liquidations himself and gets a liquidation fee of $1000 in total.</li>
+    <li>Alice calls <code>deferredSetSymbolsPrice</code> and after that Alice receives all the liquidation fees that Bob received above +- PnL, correct?</li>
+    <li>Bob loses these funds and Alice gets them (as I understand, doesn't even steal them necessarily).</li>
+    </ol>
+    <p>If we simplify the attack path as much as possible, is it correct?</p>
+    <p><strong>xiaoming9090</strong></p>
+    <blockquote>
+      <p>I think I need clarification on the attack path. I'll show how I see it and please correct me if it's wrong or not:</p>
+      <ol>
+      <li>Bob is partyA.</li>
+      <li>Bob is liquidated by Alice and his balance is set at 0.</li>
+      <li>Bob does some liquidations himself and gets a liquidation fee of $1000 in total.</li>
+      <li>Alice calls <code>deferredSetSymbolsPrice</code> and after that Alice receives all the liquidation fees that Bob received above +- PnL, correct?</li>
+      <li>Bob loses these funds and Alice gets them (as I understand, doesn't even steal them necessarily).</li>
+      </ol>
+      <p>If we simplify the attack path as much as possible, is it correct?</p>
+    </blockquote>
+    <p><a href="https://github.com/WangSecurity">@WangSecurity</a> </p>
+    <p>Each PartyA's account has a liquidation fee (LF) component, which is reserved and locked.</p>
+    <ul>
+    <li>Refer to explanation of Liquidation Fee (LF) at <a href="https://github.com/SYMM-IO/protocol-core?tab=readme-ov-file#sendquote">https://github.com/SYMM-IO/protocol-core?tab=readme-ov-file#sendquote</a></li>
+    <li>Refer to the diagram at <a href="https://github.com/SYMM-IO/protocol-core?tab=readme-ov-file#liquidate-party-a">https://github.com/SYMM-IO/protocol-core?tab=readme-ov-file#liquidate-party-a</a> where the blue section refer to the locked Liquidation Fee of a PartyA's account.</li>
+    </ul>
+    <p>The PartyA's locked liquidation fee (LF) is the prize that will be paid to the liquidator. In my scenario, the locked LF of Bob's PartyA account is \$100. Thus, any liquidator that liquidates Bob's PartyA is entitled to a maximum of $100, as per the protocol's specification. This liquidator fee was agreed upon by both the PartyA (maker) and PartyB (taker) when they opened the position and finalized within the protocol.</p>
+    <p>The protocol specification already clearly dictates that any liquidator who liquidates Bob's PartyA is entitled to a maximum of \$100, which is PartyA's locked liquidation fee (LF). However, in the scenario mentioned in the report, the liquidator (Alice) received \$900 instead of \$100, which deviates from the protocol specification.</p>
+    <p>The liquidator (Alice) took more than what was expected from Bob's account. When a liquidator liquidates Bob's account, they are not entitled to all the assets left in the account. They are only entitled to \$100 and not anything more than that.</p>
+    <p><strong>WangSecurity</strong></p>
+    <p>Thank you for that clarification, but there's still one part I might be missing. In your scenario, <strong>after</strong> Alice liquidates Bob (PartyA), and <strong>before</strong> she receives these $100 of LF, Bob also gets $1000. Is it because he liquidated the previous PartyA or other users?</p>
+    <p><strong>xiaoming9090</strong></p>
+    <blockquote>
+      <p>Thank you for that clarification, but there's still one part I might be missing. In your scenario, <strong>after</strong> Alice liquidates Bob (PartyA), and <strong>before</strong> she receives these $100 of LF, Bob also gets $1000. Is it because he liquidated the previous PartyA or other users?</p>
+    </blockquote>
+    <p><a href="https://github.com/WangSecurity">@WangSecurity</a> </p>
+    <p>Firstly, the term "PartyA" is the same as "User/Other Users". Users are normal people who trade on Symm platform and anyone with a blockchain wallet can do so (permissionless).</p>
+    <p>Secondly, Alice did not receive $100 in my scenario. Instead, she receives $900, which is incorrect and much more than expected. This amount exceeds the maximum allowed liquidation fee of $100 she is entitled. Effectively, $800 is "stolen" from Bob and Bob lost $800.</p>
+    <p>Following are the timeline of the events for reference:</p>
+    <p></p>
+    <p><strong>WangSecurity</strong></p>
+    <p>Thank you, but I'm not sure if it answers my question. </p>
+    <p>In T3, it says "Some liquidations have settled and Bob receives 1000 as a liquidation fee". It's Bob liquidating other users correct? Just need to clarify where these funds come from.</p>
+    <p><strong>xiaoming9090</strong></p>
+    <blockquote>
+      <p>Thank you, but I'm not sure if it answers my question.</p>
+      <p>In T3, it says "Some liquidations have settled and Bob receives 1000 as a liquidation fee". It's Bob liquidating other users correct? Just need to clarify where these funds come from.</p>
+    </blockquote>
+    <p><a href="https://github.com/WangSecurity">@WangSecurity</a> </p>
+    <ul>
+    <li>At T1, Bob (Liquidator) kick-off the liquidation process against other users (e.g., James and Jack). James has 500 locked as LF, and Jack also has 500 locked as LF.</li>
+    <li>At T3, the liquidations have settled, and the locked LF of James and Jack, which totals 1000, will be transferred to Bob. In short, the funds come from James and Jack, which Bob gains as compensation for the service he has provided in liquidating them.</li>
+    </ul>
+    <p><strong>WangSecurity</strong></p>
+    <p>Thank you very much. I agree that this scenario is viable, even though it's very unlikely to occur, it's still possible with high constraints. Planning to accept the escalation and validate the issue with medium severity.</p>
+    <p><strong>WangSecurity</strong></p>
+    <p>Result:<br>
+    Medium<br>
+    Unique </p>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>Escalations have been resolved successfully!</p>
+    <p>Escalation status:</p>
+    <ul>
+    <li><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/6/#issuecomment-2194931242">xiaoming9090</a>: accepted</li>
+    </ul>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The Lead Senior Watson signed off on the fix.</p>
+    <h1 id="issue-m-2-deferred-liquidation-can-get-stuck-at-step-one-of-the-liquidation-process-if-the-nonce-increment">Issue M-2: Deferred Liquidation can get stuck at step one of the liquidation process if the nonce increment</h1>
+    <p>Source: <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/8">https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/8</a> </p>
+    <h2 id="found-by-3">Found by</h2>
+    <p>xiaoming90</p>
+    <h2 id="summary-3">Summary</h2>
+    <p>Deferred Liquidation can get stuck at step one of the liquidation process if the nonce increments, leading to a loss of assets.</p>
+    <h2 id="vulnerability-detail-3">Vulnerability Detail</h2>
+    <p>Assume the following:</p>
+    <ol>
+    <li>At T10, PartyA becomes liquidatable due to price movement, resulting in a drop in PnL</li>
+    <li>At T20, PartyA is solvent again. This can be due to various reasons, such as users allocating more funds or the prices recovering. Note that in the new version of the protocol, allocating funds does not lead to an increase in the account's nonce.</li>
+    </ol>
+    <blockquote>
+      <p>[!NOTE]</p>
+      <p>Per the <a href="https://naveed1.notion.site/Symmio-changes-in-version-0-8-3-0dc891da26fc4706a59ba7295a26dfbd">documentation</a>, the purpose of deferred liquidation is to allow the liquidator to liquidate the user who was liquidated at a certain block (it can be the current block or a block in the past). Even if PartyA is solvent in the current block, the account can still be liquidated if it has been eligible for liquidation in the past. The excess collateral in the accounts will returned back to the users.</p>
+    </blockquote>
+    <ol start="3">
+    <li><p>Still at T20. A liquidator (Bob) is aware that PartyA is liquidatable at T10. Thus, he requests the deferred liquidation signature from Muon. At T10, PartyA's nonce is equal to 555. The <code>liquidationId</code>, <code>liquidationTimestamp</code>, <code>partyANonces</code> of the signature will be 100, T10, and 555, respectively. He proceeds to call the <code>deferredLiquidatePartyA</code> function with the signature, and the <code>liquidationId</code> of 100 is locked in the system. PartyA's liquidation status is set to true, and the account is technically "frozen".</p></li>
+    <li><p>At T21, one of the PartyBs that PartyA trades with triggers the <code>chargeFundingRate</code> function against the PartyA to charge a funding rate (non-malicious event), or it can also be executed intentionally with malicious intention. Note that one PartyA can trade with multiple PartyBs. The function will check if PartyA is solvent, and the <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/FundingRate/FundingRateFacetImpl.sol#L73">solvency check</a> will pass because PartyA is solvent at this point (T21). At the <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/FundingRate/FundingRateFacetImpl.sol#L76">end of the function</a>, PartyA's nonce will increment to 556.</p></li>
+    <li><p>The liquidator's <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62">deferredSetSymbolsPrice</a> transaction gets executed at T22. It is normal to have a slight delay due to many reasons, such as network congestion, low gas, or some preparation needed. Since the PartyA's nonce on the liquidation signature (555) is different from the current PartyA's nonce (556), the liquidation signature (liquidationId=100) will no longer be considered valid, and it cannot be used to proceed with the second step (set symbol price) of the liquidation process. The signature check is performed <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L66">here</a>.</p></li>
+    <li><p>If the liquidator attempts to fetch the liquidation signature for T10 from Muon again, PartyA's nonce of the signature will always remain at 555 because this is PartyA's nonce value at T10.</p></li>
+    <li><p>As a result, liquidation for PartyA will be struck.</p></li>
+    </ol>
+    <h2 id="impact-3">Impact</h2>
+    <p>Loss of assets for the counterparty as the transfer of the assets from a liquidatable account to the counterparty cannot be made. The liquidation process cannot be completed as the liquidatable account is stuck.</p>
+    <p>In addition, since the liquidatable account is stuck, the assets under the accounts are also locked.</p>
+    <h2 id="code-snippet-3">Code Snippet</h2>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/liquidation/DeferredLiquidationFacetImpl.sol#L62</a></p>
+    <h2 id="tool-used-3">Tool used</h2>
+    <p>Manual Review</p>
+    <h2 id="recommendation-3">Recommendation</h2>
+    <p>After step one of the deferred liquidation process, Party A's nonce should not change under any circumstance. Otherwise, the liquidation will be stuck.</p>
+    <p>Upon review of the codebase, it was found that only the <code>chargeFundingRate</code> function can update PartyA's nonce after step one of the deferred liquidation process. Thus, consider adding the <code>notLiquidatedPartyA</code> modifier to the <code>chargeFundingRate</code> function to prevent anyone from charging the funding rate against a PartyA account already marked as liquidated to mitigate this issue.</p>
+    <pre><code class="diff language-diff">    function chargeFundingRate(
+            address partyA,
+            uint256[] memory quoteIds,
+            int256[] memory rates,
+            PairUpnlSig memory upnlSig
+    +    ) external whenNotPartyBActionsPaused notLiquidatedPartyA(partyA) {
+    -    ) external whenNotPartyBActionsPaused {
+            FundingRateFacetImpl.chargeFundingRate(partyA, quoteIds, rates, upnlSig);
+            emit ChargeFundingRate(msg.sender, partyA, quoteIds, rates);
+        }</code></pre>
+    <h2 id="discussion-3">Discussion</h2>
+    <p><strong>sherlock-admin4</strong></p>
+    <p>1 comment(s) were left on this issue during the judging contest.</p>
+    <p><strong>Hash01011122</strong> commented:</p>
+    <blockquote>
+      <p>Low/Med, Watson assumes Deferred liquidation can get stuck because of nonce increment via network congestion, low gas or some additional preparation which is unrealistic to occur as most of the liquidation is done in a single block still there is room for this to occur. Probability of this happening is low</p>
+    </blockquote>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The protocol team fixed this issue in the following PRs/commits:<br>
+    <a href="https://github.com/SYMM-IO/protocol-core/pull/50">https://github.com/SYMM-IO/protocol-core/pull/50</a></p>
+    <p><strong>xiaoming9090</strong></p>
+    <p>Escalate</p>
+    <p>This issue should be at least a Medium Risk due to its significant impact (Loss of assets) if the risk is realized.</p>
+    <p>The report has demonstrated how it could lead to asset loss or stuck under normal conditions. The liquidation process is divided into multiple stages/steps as follows:</p>
+    <ul>
+    <li>Stage 1 - <code>deferredLiquidatePartyA</code></li>
+    <li>Stage 2 - <code>deferredSetSymbolsPrice</code></li>
+    <li>Stage 3 - <code>liquidatePendingPositionsPartyA</code></li>
+    <li>Stage 4 - <code>liquidatePositionsPartyA</code></li>
+    </ul>
+    <p>There is no requirement for the liquidator to complete all the stages in one go within a single block, and this requirement is also not being enforced within the smart contracts. As such, liquidators have the option to execute each of the above stages in a single or multiple blocks as they see fit.</p>
+    <p>Thus, it is a valid scenario where Stage 2 of the liquidation process is executed on a different block from Stage 1 of the liquidation process, resulting in the issue highlighted in this report to occur.</p>
+    <p>Per Sherlock’s judging rules (<a href="https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue">https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue</a>)</p>
+    <blockquote>
+      <p>V. How to identify a medium issue:<br>
+      Causes a loss of funds but requires certain external conditions or specific states, or a loss is highly constrained. The losses must exceed small, finite amount of funds, and any amount relevant based on the precision or significance of the loss.</p>
+    </blockquote>
+    <p>Whenever the liquidator does not execute Stage 1 and Stage 2 of the liquidation process within a single block, the issue mentioned in this report can occur, causing the user’s asset to be stuck. Thus, it meets Sherlock's requirement of a Medium Risk, where it causes a loss of funds but requires certain external conditions or specific states.</p>
+    <p><strong>sherlock-admin3</strong></p>
+    <blockquote>
+      <p>Escalate</p>
+      <p>This issue should be at least a Medium Risk due to its significant impact (Loss of assets) if the risk is realized.</p>
+      <p>The report has demonstrated how it could lead to asset loss or stuck under normal conditions. The liquidation process is divided into multiple stages/steps as follows:</p>
+      <ul>
+      <li>Stage 1 - <code>deferredLiquidatePartyA</code></li>
+      <li>Stage 2 - <code>deferredSetSymbolsPrice</code></li>
+      <li>Stage 3 - <code>liquidatePendingPositionsPartyA</code></li>
+      <li>Stage 4 - <code>liquidatePositionsPartyA</code></li>
+      </ul>
+      <p>There is no requirement for the liquidator to complete all the stages in one go within a single block, and this requirement is also not being enforced within the smart contracts. As such, liquidators have the option to execute each of the above stages in a single or multiple blocks as they see fit.</p>
+      <p>Thus, it is a valid scenario where Stage 2 of the liquidation process is executed on a different block from Stage 1 of the liquidation process, resulting in the issue highlighted in this report to occur.</p>
+      <p>Per Sherlock’s judging rules (<a href="https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue">https://docs.sherlock.xyz/audits/judging/judging#v.-how-to-identify-a-medium-issue</a>)</p>
+      <blockquote>
+        <p>V. How to identify a medium issue:<br>
+        Causes a loss of funds but requires certain external conditions or specific states, or a loss is highly constrained. The losses must exceed small, finite amount of funds, and any amount relevant based on the precision or significance of the loss.</p>
+      </blockquote>
+      <p>Whenever the liquidator does not execute Stage 1 and Stage 2 of the liquidation process within a single block, the issue mentioned in this report can occur, causing the user’s asset to be stuck. Thus, it meets Sherlock's requirement of a Medium Risk, where it causes a loss of funds but requires certain external conditions or specific states.</p>
+    </blockquote>
+    <p>You've created a valid escalation!</p>
+    <p>To remove the escalation from consideration: Delete your comment.</p>
+    <p>You may delete or edit your escalation comment anytime before the 48-hour escalation window closes. After that, the escalation becomes final.</p>
+    <p><strong>WangSecurity</strong></p>
+    <p>I need some clarification on how the loss of funds occurs, if the PartyA was liquidatable at T10, but is not liquidatable at T20, what is the loss of funds here exactly? Maybe a numeric example would be perfect here <a href="https://github.com/xiaoming9090">@xiaoming9090</a>  </p>
+    <p>Additionally, are PartyB and PartyA roles or contracts and as I understand they’re considered Trusted?</p>
+    <p><strong>xiaoming9090</strong></p>
+    <blockquote>
+      <p>I need some clarification on how the loss of funds occurs, if the PartyA was liquidatable at T10, but is not liquidatable at T20, what is the loss of funds here exactly? Maybe a numeric example would be perfect here <a href="https://github.com/xiaoming9090">@xiaoming9090</a>  </p>
+      <p>Additionally, are PartyB and PartyA roles or contracts and as I understand they’re considered Trusted?</p>
+    </blockquote>
+    <p><a href="https://github.com/WangSecurity">@WangSecurity</a> </p>
+    <p>Question: <code>how the loss of funds occurs</code><br>
+    Answer: When this issue is realized, the liquidation process will be stuck, and the account will be frozen. No one (users or liquidators) can retrieve the assets in the "frozen" account. Thus, all assets within the frozen account are effectively lost. If the "frozen" account has $10000 worth of assets, this amount will be lost.</p>
+    <p>Question: <code>if the PartyA was liquidatable at T10, but is not liquidatable at T20</code><br>
+    Answer: To simplify, it is a special new feature of Symm IO that allows a liquidator to "go back in time". Assume Bob's account becomes liquidatable for a moment due to volatile market movement (e.g., at T10). The price movement goes down and then up within a short period of time. Thus, when the liquidators detect it at T20, the account might be solvent again since the price has recovered. However, that does not matter for the liquidator because they are allowed to liquidate Bob's account based on old historical data at T10.</p>
+    <p>Question: <code>PartyB and PartyA roles or contracts and as I understand they’re considered Trusted?</code></p>
+    <ul>
+    <li>PartyA is permissionless, and anyone can become a PartyA. Thus, it is considered as Untrusted.</li>
+    <li>PartyB has to be whitelisted by the protocol. However, in my report's scenario, PartyB does not need to behavior maliciously. Thus, it does not matter whether PartyB is trusted or not. PartyBs will periodically charge funding rates on PartyAs, which is a normal operation and non-malicious event. When the <code>chargeFundingRate</code> function is triggered at T21, the issue will be realized.</li>
+    </ul>
+    <p><strong>WangSecurity</strong></p>
+    <p>Thank you very much! And another question on the scenario, if we change it a bit to the following:</p>
+    <ol start="3">
+    <li>At T20, PartyB calls <code>chargeFundingRate</code>, changing the Nonce to 556.</li>
+    <li>At 21, Bob (liquidator) will request the deferred liquidation signature from Muon. But the signature will return the nonce of 555, correct?</li>
+    </ol>
+    <p><strong>xiaoming9090</strong></p>
+    <blockquote>
+      <p>Thank you very much! And another question on the scenario, if we change it a bit to the following:</p>
+      <ol start="3">
+      <li>At T20, PartyB calls <code>chargeFundingRate</code>, changing the Nonce to 556.</li>
+      <li>At 21, Bob (liquidator) will request the deferred liquidation signature from Muon. But the signature will return the nonce of 555, correct?</li>
+      </ol>
+    </blockquote>
+    <p><a href="https://github.com/WangSecurity">@WangSecurity</a> </p>
+    <p>Firstly, a PartyA can interact with many PartyBs within the system. At any point, each PartyB can call the <code>chargeFundingRate</code> function.</p>
+    <p>Secondly, the steps in the POC should not be swapped. The timing and sequence of each step are important for the edge case to be triggered. The report presents an edge case that will happen when the <code>chargeFundingRate</code> function is triggered after the <code>deferredLiquidatePartyA</code> function, not the other way around. </p>
+    <p>On a side note, the sponsor has accepted the technical aspect of the POC, so there is no doubt about its correctness and the possibility of this edge case occurring. Otherwise, a <a href="https://github.com/SYMM-IO/protocol-core/pull/50">fix</a> would not be required if the edge case cannot occur.</p>
+    <p>The reason why this has been wrongly judged as Low in the first place is due to the following comments:</p>
+    <blockquote>
+      <p>Low/Med, Watson assumes Deferred liquidation can get stuck because of nonce increment via network congestion, low gas or some additional preparation which is unrealistic to occur as most of the liquidation is done in a single block still there is room for this to occur. Probability of this happening is low</p>
+    </blockquote>
+    <p>However, in Sherlock, issues are not judged based on the probability that an issue can happen.</p>
+    <p><strong>WangSecurity</strong></p>
+    <p>Thank you, I agree that even though this case might be highly unlikely, it's viable and should be deemed valid. Planning to accept the escalation and validate the report with medium severity, since the constraints for this scenario are quite high.</p>
+    <p>And <a href="https://github.com/xiaoming9090">@xiaoming9090</a> just for your info, the comment from a judge you quoted is not from the Lead Judge, but from another Judge from the contest. That doesn't affect anything, just making sure you're aware of that.</p>
+    <p><strong>WangSecurity</strong></p>
+    <p>Result:<br>
+    Medium<br>
+    Unique</p>
+    <p><strong>sherlock-admin4</strong></p>
+    <p>Escalations have been resolved successfully!</p>
+    <p>Escalation status:</p>
+    <ul>
+    <li><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/8/#issuecomment-2194928425">xiaoming9090</a>: accepted</li>
+    </ul>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The Lead Senior Watson signed off on the fix.</p>
+    <h1 id="issue-m-3-collateral-can-still-be-allocated-to-partya-when-the-system-is-paused-by-exploiting-the-new-internal-transfer-function">Issue M-3: Collateral can still be allocated to PartyA when the system is paused by exploiting the new internal transfer function</h1>
+    <p>Source: <a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/11">https://github.com/sherlock-audit/2024-06-symmetrical-update-2-judging/issues/11</a> </p>
+    <h2 id="found-by-4">Found by</h2>
+    <p>xiaoming90</p>
+    <h2 id="summary-4">Summary</h2>
+    <p>Collateral can still be allocated to PartyA when the system is paused by exploiting the new internal transfer function.</p>
+    <h2 id="vulnerability-detail-4">Vulnerability Detail</h2>
+    <p>The <code>allocate</code> and <code>depositAndAllocate</code> functions are guarded by the <code>whenNotAccountingPaused</code> modifier to ensure that collateral can only be allocated when the accounting is not paused.</p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacet.sol#L48">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacet.sol#L48</a></p>
+    <pre><code class="solidity language-solidity">File: AccountFacet.sol
+    46:     /// @notice Allows Party A to allocate a specified amount of collateral. Allocated amounts are which user can actually trade on.
+    47:     /// @param amount The precise amount of collateral to be allocated, specified in 18 decimals.
+    48:     function allocate(uint256 amount) external whenNotAccountingPaused notSuspended(msg.sender) notLiquidatedPartyA(msg.sender) {
+    49:         AccountFacetImpl.allocate(amount);
+    ..SNIP..
+    52:     }
+    53: 
+    54:     /// @notice Allows Party A to deposit a specified amount of collateral and immediately allocate it.
+    55:     /// @param amount The precise amount of collateral to be deposited and allocated, specified in collateral decimals.
+    56:     function depositAndAllocate(uint256 amount) external whenNotAccountingPaused notLiquidatedPartyA(msg.sender) notSuspended(msg.sender) {
+    57:         AccountFacetImpl.deposit(msg.sender, amount);
+    58:         uint256 amountWith18Decimals = (amount * 1e18) / (10 ** IERC20Metadata(GlobalAppStorage.layout().collateral).decimals());
+    59:         AccountFacetImpl.allocate(amountWith18Decimals);
+    ..SNIP..
+    63:     }</code></pre>
+    <p>However, malicious users can bypass this restriction by exploiting the newly implemented <code>AccountFacet.internalTransfer</code> function. When the global pause (<code>globalPaused</code>) and accounting pause (<code>accountingPaused</code>) are enabled, malicious users can use the <code>AccountFacet.internalTransfer</code> function, which is not guarded by the <code>whenNotAccountingPaused</code> modifier, to continue allocating collateral to their accounts, effectively bypassing the pause.</p>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacet.sol#L79">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacet.sol#L79</a></p>
+    <pre><code class="solidity language-solidity">File: AccountFacet.sol
+    74:     /// @notice Transfers the sender's deposited balance to the user allocated balance.
+    75:     /// @dev The sender and the recipient user cannot be partyB.
+    76:     /// @dev PartyA should not be in the liquidation process.
+    77:     /// @param user The address of the user to whom the amount will be allocated.
+    78:     /// @param amount The amount to transfer and allocate in 18 decimals.
+    79:     function internalTransfer(address user, uint256 amount) external whenNotAccountingPaused whenNotInternalTransferPaused notPartyB userNotPartyB(user) notSuspended(msg.sender) notLiquidatedPartyA(user){
+    80:         AccountFacetImpl.internalTransfer(user, amount);
+    ..SNIP..
+    85:     }</code></pre>
+    <h2 id="impact-4">Impact</h2>
+    <p>When the global pause (<code>globalPaused</code>) and accounting pause (<code>accountingPaused</code>) are enabled, this might indicate that:</p>
+    <p>1) There is an issue, error, or bug in certain areas (e.g., accounting) of the system. Thus, the funds transfer should be halted to prevent further errors from accumulating and to prevent users from suffering further losses due to this issue<br>
+    2) There is an ongoing attack in which the attack path involves transferring/allocating funds to an account. Thus, the global pause (<code>globalPaused</code>) and accounting pause (<code>accountingPaused</code>) have been activated to stop the attack. However, it does not work as intended, and the hackers can continue to exploit the system by leveraging the new internal transfer function to workaround the restriction.</p>
+    <p>In both scenarios, this could lead to a loss of assets.</p>
+    <h2 id="code-snippet-4">Code Snippet</h2>
+    <p><a href="https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacet.sol#L79">https://github.com/sherlock-audit/2024-06-symmetrical-update-2/blob/main/protocol-core/contracts/facets/Account/AccountFacet.sol#L79</a></p>
+    <h2 id="tool-used-4">Tool used</h2>
+    <p>Manual Review</p>
+    <h2 id="recommendation-4">Recommendation</h2>
+    <p>Add the <code>whenNotAccountingPaused</code> modifier to the <code>internalTransfer</code> function.</p>
+    <pre><code class="diff language-diff">- function internalTransfer(address user, uint256 amount) external whenNotInternalTransferPaused notPartyB userNotPartyB(user) notSuspended(msg.sender) notLiquidatedPartyA(user){
+    + function internalTransfer(address user, uint256 amount) external whenNotInternalTransferPaused notPartyB userNotPartyB(user) notSuspended(msg.sender) notLiquidatedPartyA(user){
+      AccountFacetImpl.internalTransfer(user, amount);</code></pre>
+    <h2 id="discussion-4">Discussion</h2>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The protocol team fixed this issue in the following PRs/commits:<br>
+    <a href="https://github.com/SYMM-IO/protocol-core/pull/47">https://github.com/SYMM-IO/protocol-core/pull/47</a></p>
+    <p><strong>sherlock-admin2</strong></p>
+    <p>The Lead Senior Watson signed off on the fix.</p></div></div>
