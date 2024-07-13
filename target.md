@@ -10,4 +10,5 @@
   - [ ] substrate
 - [ ] Parachain
 - [ ] Moonbeam
-- [ ]  
+- [ ] Rio Network
+- [ ] 

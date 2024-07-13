@@ -21,3 +21,29 @@
 
 
 
+#### ERC1404
+
+
+
+### Delegatecall
+
+- When contract A executes delegatecall to contract B, B's code is executed with contract A's storage, msg.sender and msg.value.
+- In Solidity, delegatecall is a low-level function that allows a contract to delegate its call to another contract (borrowing the functionality of another contract) while still preserving its own storage and context. When a contract makes a delegatecall, the code at the target address is executed in the context of the calling contract. This means that the storage, state variables, and functions of the calling contract are accessible to the code being executed.
+- https://medium.com/@ajaotosinserah/mastering-delegatecall-in-solidity-a-comprehensive-guide-with-evm-walkthrough-6ddf027175c7
+- https://medium.com/@bansaltushar014/delegatecall-in-solidity-4138b121cbe
+- 
+
+### Clones from OZ
+
+
+### Proxy systems
+
+
+### aave flashloan callback and initiator
+
+
+### Weird ERC20
+
+### Slippage protection
+
+### Sandwich attack
