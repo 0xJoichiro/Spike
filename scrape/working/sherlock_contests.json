@@ -1,0 +1,146 @@
+[
+  {
+    "name": "Biconomy",
+    "link": "https://codehawks.cyfrin.io/c/2024-07-biconomy",
+    "prize": "$30,000 USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Audit 402 Invitational",
+    "link": "https://github.com/code-423n4/2024-07-audit-402",
+    "prize": "$50,500 in USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Aloe Update",
+    "link": "https://audits.sherlock.xyz/contests/402",
+    "prize": "$23000",
+    "nSLOC": "880"
+  },
+  {
+    "name": "CCIP v1.5",
+    "link": "https://www.codehawks.com/contests/clxwwzifk001r8s1kz98wbpyz",
+    "prize": "$200,000 USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "illumineX",
+    "link": "https://x.com/HatsFinance/status/1805875002128187433",
+    "prize": "$44,000 in $ROSE",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Super Boring",
+    "link": "https://audits.sherlock.xyz/contests/360",
+    "prize": "$28500",
+    "nSLOC": "1,108"
+  },
+  {
+    "name": "DittoETH Invitational",
+    "link": "https://github.com/code-423n4/2024-07-dittoeth",
+    "prize": "$13,600 in USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Allora",
+    "link": "https://audits.sherlock.xyz/contests/454",
+    "prize": "$119000",
+    "nSLOC": "13,359"
+  },
+  {
+    "name": "Fuel Academy",
+    "link": "https://immunefi.com/boost/fuel-network-attackathon/",
+    "prize": "$1,300,000 USDC",
+    "nSLOC": "100,000"
+  },
+  {
+    "name": "Fenix Finance",
+    "link": "https://x.com/HatsFinance/status/1806611137796231246",
+    "prize": "$12,000 USDC",
+    "nSLOC": "856"
+  },
+  {
+    "name": "Velocimeter",
+    "link": "https://audits.sherlock.xyz/contests/442",
+    "prize": "$110000",
+    "nSLOC": "3,878"
+  },
+  {
+    "name": "Optimism Superchain",
+    "link": "https://github.com/code-423n4/2024-07-optimism",
+    "prize": "200,000 OP",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Boost Account AA Wallet",
+    "link": "https://audits.sherlock.xyz/contests/426",
+    "prize": "$63500",
+    "nSLOC": "2,364"
+  },
+  {
+    "name": "Karak Restaking",
+    "link": "https://github.com/code-423n4/2024-07-karak",
+    "prize": "$55,000 in USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Zaros Finance",
+    "link": "https://codehawks.cyfrin.io/c/2024-07-zaros",
+    "prize": "$60,000 USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Vana",
+    "link": "https://github.com/code-423n4/2024-06-vana",
+    "prize": "$40,400 in USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "MakerDAO Endgame",
+    "link": "https://audits.sherlock.xyz/contests/333",
+    "prize": "$1.350.000 DAI",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Folks Finance",
+    "link": "https://immunefi.com/boost/folksfinance-boost/",
+    "prize": "$100,000 USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Shardeum: Core",
+    "link": "https://immunefi.com/boost/shardeum-core-boost/",
+    "prize": "$500,000 USDC",
+    "nSLOC": "70,381"
+  },
+  {
+    "name": "Shardeum: Ancillaries",
+    "link": "https://immunefi.com/boost/shardeum-ancillaries-boost/",
+    "prize": "$200,000 USDC",
+    "nSLOC": "55,472"
+  },
+  {
+    "name": "LoopFi",
+    "link": "https://github.com/code-423n4/2024-06-loopfi",
+    "prize": "$75,100 in USDC",
+    "nSLOC": "N/A"
+  },
+  {
+    "name": "Firedancer",
+    "link": "https://immunefi.com/boost/firedancer-boost/",
+    "prize": "$1,000,000 USDC",
+    "nSLOC": "200,000"
+  },
+  {
+    "name": "Notional Leveraged Vaults: Pendle PT and Vault Incentives",
+    "link": "https://audits.sherlock.xyz/contests/446",
+    "prize": "Escalations",
+    "nSLOC": ""
+  },
+  {
+    "name": "Usual -Pegasus",
+    "link": "https://cantina.xyz/competitions/31a752e3-8ece-49b3-a9ee-d7294c659340",
+    "prize": "Escalations",
+    "nSLOC": ""
+  }
+]
