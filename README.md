@@ -34,14 +34,37 @@ steps
 
 Schedule - 
 
-Live => https://audits.sherlock.xyz/contests/442
+Live => 
+
+- https://audits.sherlock.xyz/contests/442 (16-22 July)
+- (23-29 July)
+- 30 July-5 August
+
 
 
 Shadow =>
-- 15 => 80
-- 16 => 332
-- 17 => 82
+
+- 17 => 248
 - 18 => 191
 - 19 => 330
 - 20 => 196
 - 21 => 98
+- 22 => 130
+- 23 => 80
+- 24 => 332
+
+
+
+
+
+- cloc less to more read
+  - ```cloc --by-file .```
+  - run my script to just scope ones and make final.json
+- tools
+  - aderyn
+  - slither
+  - wake
+  - solhint
+- invariants - statefull and stateless
+- symobic execution
+- formal verification

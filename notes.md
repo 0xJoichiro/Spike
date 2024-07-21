@@ -44,6 +44,18 @@
 
 ### Weird ERC20
 
+
+
 ### Slippage protection
 
 ### Sandwich attack
+
+
+### L1 to L2 fees
+
+- The Gelato protocol properly handles L1 data fees(https://docs.gelato.network/web3-services/relay/gelatos-fee-oracle#arguments-2)
+- Every L2 has its own formula for calculating the L1 data fee, so different versions of the code will have to be written for each L2
+- There are two types of gas fees on L2s: The L2 execution fees and the L1 Data fees.
+
+
+### EIP1559 gas algorithm

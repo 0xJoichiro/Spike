@@ -125,13 +125,67 @@ Let's look at the `MarginTrading._openTrade` function that is called when a trad
 `forge test --match-path test/forge/POC.t.sol --fork-url https://rpc.ankr.com/optimism --fork-block-number 120567055 -vv`
 
 
+---------------------------------------------------------
+
+
+## Contest 130 - DODO V3 update
+
+- https://audits.sherlock.xyz/contests/130
+- https://github.com/0xJoichiro/2023-12-dodo
+
+<img src="image-5.png" alt="alt text" height="50%" width="50%">
+
+### Valid - (1), Invalid 35
+
+- 1. [M1- Inability to Re-add oldToken After Execution of D3MakerFreeSlot.setNewTokenAndReplace()](https://github.com/sherlock-audit/2023-12-dodo-judging/issues/19)
+
+#### Summary
+
+- 1. The setNewTokenAndReplace() function is designed to replace an existing token with a new token in a slot, thereby saving gas. However, this function only removes the oldToken's information from state.tokenMMInfoMap and does not clear its index from state.priceListInfo.tokenIndexMap. Consequently, the system behaves as if the oldToken is still present, preventing its re-addition.
+
+#### POC - TestCaseFile
+
+- 1. 
+
+
+
+---------------------------------------------------------
+
+
+## Contest 248 - xKeeper
+
+- https://audits.sherlock.xyz/contests/248
+- https://github.com/0xJoichiro/2023-12-dodo
+
+<img src="image-6.png" alt="alt text" height="50%" width="50%">
+
+
+
+### Valid - (2), Invalid 158
+
+- 1. [M1 - Keep3r Relay Implementations are Not Compatible with Keep3r in Optimism and Executions Will Always Revert](https://github.com/sherlock-audit/2024-04-xkeeper-judging/issues/132)
+- 2. [M2 - OpenRelay.sol does not account for the Layer1 gas fees used in the transaction while calculating the fee to be paid to the relayer](https://github.com/sherlock-audit/2024-04-xkeeper-judging/issues/32)
+
+#### Summary
+
+- 1. Keep3rRelay and Keep3rBondedRelay uses deprecated function for sidechains and exec calls will always revert.
+- 2. The exec() function in OpenRelay.sol is structured in way that it calls the exec() function in AutomationVault.sol twice. First one with _execData where the jobs are specified and second one with the _feeData to be compensated for the job execution. While calculating the compensation amount after the first call it only includes the L2 gas fees (if the contracts are deployed on L2) and it does not include the L1 fees.
+
+#### POC - TestCaseFile
+
+- 1. 
+- 2. 
+
+
+
+
 <!-- ---------------------------------------------------------
 
 
 ## Contest Number - Name
 
 
-image
+<img src="image-7.png" alt="alt text" height="50%" width="50%">
 
 
 ### Valid - (1), Invalid 103
@@ -148,8 +202,150 @@ image
  -->
 
 
+# TBD
+
+---------------------------------------------------------
 
 
-<!-- 
+## Contest 196 - Telcoin Platform Audit Update
+
+<img src="image-7.png" alt="alt text" height="50%" width="50%">
+
+
+### Valid - (2), Invalid 74
+
+- 1. [M1 - BridgeRelay makes an approval to the same predicate address, despite different tokens/ eth having different predicates](https://github.com/sherlock-audit/2024-02-telcoin-platform-audit-update-judging/issues/40)
+- 2. [M2 - Missing blacklist check beforeTokenTransfer allows anyone to bypass the blacklist mechanism](https://github.com/sherlock-audit/2024-02-telcoin-platform-audit-update-judging/issues/28)
+
+#### Summary
+
+- 1. When the BridgeRelay.transferERCToBridge gets called, it approves the hardcoded ERC20Predicate to use the ERC20 tokens. However, the bridge uses more than one predicate to lock the tokens. Here the bridge retrieves the predicate address based on the type of token to be bridged. If a token that uses different predicate than the hardcoded is sent to the BridgeRelay, it will be forever stuck there since the right predicate will not have approval to transfer it. There also exists a risk that a token can change its predicate at any time.
+- 2. The stablecoin contracts inherit blacklisting mechanism. Although upon getting blacklisted, the user's funds are transferred, the user can still receive and send tokens, since non of the transferring methods are overridden.
+
+#### POC - TestCaseFile
+
+Command -> file link
+
+- 1. npx hardhat test test/stablecoins/Stablecoin.test.ts -> https://github.com/0xJoichiro/2024-02-telcoin-platform-audit-update/blob/cfa0c4ec3d945cc643399353696e34286cd79eb3/telcoin-contracts/test/stablecoins/Stablecoin.test.ts#L93C1-L172C1
+- 2. 
+
+
+#### Giveaways
+
+- hardcoded and key mapping for the same thing not checked
+- Frontrun and backrun
+- Transfer function wont care even if blacklisted
+- EIP1967 storage slots
+- Beacon proxy
+- Oz ClonableBeaconProxy.sol
+- ERC7201 
+- 1967 eip
 - 
-- 130 -->
+
+
+---------------------------------------------------------
+
+
+## Contest 330 - Gamma - Locked Staking Contract
+
+- https://audits.sherlock.xyz/contests/330
+- https://github.com/0xJoichiro/2024-05-gamma-staking
+
+
+
+<img src="image-8.png" alt="alt text" height="50%" width="50%">
+
+
+### Valid - (2), Invalid 298
+
+- 1. 
+- 2. 
+
+#### Summary
+
+- 1. 
+- 2. 
+
+#### POC - TestCaseFile
+
+- 1. 
+- 2. 
+
+
+#### Giveaways
+
+
+---------------------------------------------------------
+
+
+## Contest 80 - Gamma - Locked Staking Contract
+
+- https://audits.sherlock.xyz/contests/330
+- https://github.com/0xJoichiro/2024-05-gamma-staking
+
+
+
+<img src="image-8.png" alt="alt text" height="50%" width="50%">
+
+
+### Valid - (2), Invalid 298
+
+- 1. 
+- 2. 
+
+#### Summary
+
+- 1. 
+- 2. 
+
+#### POC - TestCaseFile
+
+- 1. 
+- 2. 
+
+
+#### Giveaways
+
+
+
+
+  {
+    "contest_id": "80",
+    "scope": "553 nSLOC",
+    "num_issues": 2,
+    "nsloc_num": 553,
+    "rating": 1106,
+    "status": "No"
+  },
+  {
+    "contest_id": "285",
+    "scope": "916 nSLOC",
+    "num_issues": 2,
+    "nsloc_num": 916,
+    "rating": 1832,
+    "status": "No"
+  },
+  {
+    "contest_id": "187",
+    "scope": "1,083 nSLOC",
+    "num_issues": 2,
+    "nsloc_num": 1083,
+    "rating": 2166,
+    "status": "No"
+  },
+  {
+    "contest_id": "281",
+    "scope": "1,971 nSLOC",
+    "num_issues": 2,
+    "nsloc_num": 1971,
+    "rating": 3942,
+    "status": "No"
+  },
+  {
+    "contest_id": "103",
+    "scope": "2,760 nSLOC",
+    "num_issues": 2,
+    "nsloc_num": 2760,
+    "rating": 5520,
+    "status": "No"
+  },
