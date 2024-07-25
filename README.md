@@ -37,7 +37,7 @@ Schedule -
 Live => 
 
 - https://audits.sherlock.xyz/contests/442 (16-22 July)
-- (23-29 July)
+- (23-29 July) -> 
 - 30 July-5 August
 
 
