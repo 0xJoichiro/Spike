@@ -68,3 +68,89 @@ Shadow =>
 - invariants - statefull and stateless
 - symobic execution
 - formal verification
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####
+
+- click y on github for 
+- .deth.net
+- codeslaw
+- solodit
+- excalidraw
+- fuzzing
+  - echidna
+  - foundry
+- state changes
+- report
+- kaju katli work
+- no bias
+- threat modeling
+- story clash docs and code 
+- no economical sense but breaks bug
+- tests under check
+- past audit checked
+- poc
+- time management
+- one task at a time
+- checklist - https://github.com/Cyfrin/audit-checklist/blob/main/checklist.json
+- learn while audit
+- code reading
+  - contract interactions
+  - public state chanhing functions
+  - 
+  - state var
+  - entry point
+  - contract to contract 
+- correctness
+  - low hanging fruits
+  - quick calculations - tests or xcel low hanging bugs
+  - pairwise comparison
+    - symetical fxn deposit withdraw
+    - use of fxns in diff parts
+    - code vs doc
+    - with eips
+    - battle tested protocols
+    - same exte integrations
+    - common errors in checklist
+- line by line attack
+  - started my own list of attack vectors
+  - later improve speed
+- Investigate leads
+  - revisit novel/complex
+  - complexicity inc
+- how to be fast 
+  - first 3 do fast
+  - elimination of leads
+  - be curious
+  - unhandled edge cases by simplifying understanding
+  - understand complex code by execution
+- Creativity
+  - ability to think complex attacks
+  - combine m/l
+  - multistep
+  - learn new ways to manipulate state
+  - eep understanding code 
+  - offload brain - draw/write
+  - backstab    
+    - invariants to attack
+    - states to call
+- Tools
+  - carbon.now.sh
+  - auditwizard.io
+
+- Code and docs research and get back
+- mind healthy
+- if i need to find out baout the fxn i look for the test 
+- 

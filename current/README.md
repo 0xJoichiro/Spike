@@ -12,4 +12,32 @@
 
 
 
+### https://audits.sherlock.xyz/contests/333
+
+<img width="50%" height="50%" alt="image" src="https://gray-accessible-centipede-987.mypinata.cloud/ipfs/Qmcnon7ib8EGkQNP74HPpnpqeehMhmTherFSFN5hcWR9ZF">
+
+- git@github.com:sherlock-audit/2024-06-makerdao-endgame-0xjoichiro.git
+
+#### Aderyn
+
+
+#### Cloc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### [traitforge](https://code4rena.com/audits/2024-07-traitforge#top) 30-3
+### [loopfi](https://code4rena.com/audits/2024-07-loopfi#top) 4-10
+### [reserve-core](https://code4rena.com/audits/2024-07-reserve-core#top) 11 - 20
+
 
