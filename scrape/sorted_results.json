@@ -517,7 +517,7 @@
     "num_issues": 1,
     "nsloc_num": 488,
     "rating": 488,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "184",
@@ -525,7 +525,7 @@
     "num_issues": 1,
     "nsloc_num": 516,
     "rating": 516,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "78",
@@ -541,7 +541,7 @@
     "num_issues": 2,
     "nsloc_num": 438,
     "rating": 876,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "196",
@@ -549,7 +549,7 @@
     "num_issues": 2,
     "nsloc_num": 453,
     "rating": 906,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "330",
@@ -557,7 +557,7 @@
     "num_issues": 2,
     "nsloc_num": 464,
     "rating": 928,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "303",
@@ -565,7 +565,7 @@
     "num_issues": 1,
     "nsloc_num": 967,
     "rating": 967,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "80",
@@ -573,7 +573,7 @@
     "num_issues": 2,
     "nsloc_num": 553,
     "rating": 1106,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "332",
@@ -645,7 +645,7 @@
     "num_issues": 1,
     "nsloc_num": 2383,
     "rating": 2383,
-    "status": "No"
+    "status": "Yes"
   },
   {
     "contest_id": "233",

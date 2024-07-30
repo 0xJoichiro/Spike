@@ -41,3 +41,8 @@
 ### [reserve-core](https://code4rena.com/audits/2024-07-reserve-core#top) 11 - 20
 
 
+
+
+- (22 July - 26 July) - https://code4rena.com/audits/2024-07-optimism-superchain#top
+- (29 July - 2 Aug) - https://audits.sherlock.xyz/contests/333
+
